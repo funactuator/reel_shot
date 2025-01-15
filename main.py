@@ -1,12 +1,12 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from utils.video_utils import extract_frames
 import os
 import uuid
 import shutil
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List
 
 app = FastAPI()
@@ -135,6 +135,56 @@ async def get_background_task_status(unique_id: str):
         "end_time": task["end_time"],      # Already serialized or None
     }
     return JSONResponse(content=serialized_task)
+
+@app.get("/available-images")
+async def list_available_images():
+    """List all available images currently stored in the system."""
+    images = []
+    for unique_id in os.listdir(TEMP_STORAGE):
+        frame_dir = os.path.join(TEMP_STORAGE, unique_id)
+        if os.path.isdir(frame_dir):
+            for frame_name in os.listdir(frame_dir):
+                if frame_name.endswith(".png"):  # Only include PNG images
+                    images.append({
+                        "unique_id": unique_id,
+                        "frame_name": frame_name,
+                        "path": os.path.join(frame_dir, frame_name)
+                    })
+    return JSONResponse(content={"images": images})
+
+@app.get("/all-images", response_class=HTMLResponse)
+async def get_all_images(request: Request):
+    """Return an HTML page displaying all available images."""
+    base_url = str(request.base_url).rstrip("/")  # Get the base URL (e.g., http://127.0.0.1:8000)
+    images_html = []
+    for unique_id in os.listdir(TEMP_STORAGE):
+        frame_dir = os.path.join(TEMP_STORAGE, unique_id)
+        if os.path.isdir(frame_dir):
+            for frame_name in os.listdir(frame_dir):
+                if frame_name.endswith(".png"):  # Only include PNG images
+                    image_url = f"{base_url}/get-frame/{unique_id}/{frame_name}"
+                    images_html.append(
+                        f'<div style="margin: 20px; text-align: center;">'
+                        f'<h3>{frame_name}</h3>'
+                        f'<img src="{image_url}" style="max-width: 100%; height: auto;"/>'
+                        f'</div>'
+                    )
+    html_content = f"""
+    <html>
+        <head>
+            <title>All Images</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; padding: 20px; }}
+                img {{ max-width: 100%; height: auto; }}
+            </style>
+        </head>
+        <body>
+            <h1>All Available Images</h1>
+            {"".join(images_html)}
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 # Custom exception handler for 404 errors
 @app.exception_handler(404)
