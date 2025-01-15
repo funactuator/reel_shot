@@ -11,7 +11,6 @@ from typing import Dict, List
 
 # Load environment variables
 STORAGE_FOLDER = os.getenv("STORAGE_FOLDER", "storage")
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 PORT = int(os.getenv("PORT", 8000))
 DELETE_DELAY_MINS = int(os.getenv("DELETE_DELAY_MINS", 10))
