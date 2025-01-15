@@ -1,34 +1,41 @@
+import os
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from utils.video_utils import extract_frames
-import os
 import uuid
 import shutil
 import time
 from datetime import datetime
 from typing import Dict, List
 
+# Load environment variables
+STORAGE_FOLDER = os.getenv("STORAGE_FOLDER", "storage")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+PORT = int(os.getenv("PORT", 8000))
+DELETE_DELAY_MINS = int(os.getenv("DELETE_DELAY_MINS", 10))
+
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Allow requests from React app
+    allow_origins=[FRONTEND_URL],  # Allow requests from the frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Temporary storage directory
-TEMP_STORAGE = "storage"
-os.makedirs(TEMP_STORAGE, exist_ok=True)
+os.makedirs(STORAGE_FOLDER, exist_ok=True)
 
 # In-memory background task storage
 background_tasks_storage: Dict[str, Dict] = {}
 
-def delete_frames_after_delay(unique_id: str, delay_minutes: int = 10):
+def delete_frames_after_delay(unique_id: str, delay_minutes: int = DELETE_DELAY_MINS):
     """Delete frames after a specified delay."""
     time.sleep(delay_minutes * 60)  # Convert minutes to seconds
-    frame_dir = os.path.join(TEMP_STORAGE, unique_id)
+    frame_dir = os.path.join(STORAGE_FOLDER, unique_id)
     if os.path.exists(frame_dir):
         shutil.rmtree(frame_dir)
     # Update background task status to "completed"
@@ -66,7 +73,7 @@ async def extract_frames_api(
             buffer.write(video_file.file.read())
 
         # Extract frames and save them under the unique ID directory
-        frame_dir = os.path.join(TEMP_STORAGE, unique_id)
+        frame_dir = os.path.join(STORAGE_FOLDER, unique_id)
         os.makedirs(frame_dir, exist_ok=True)
         frames = extract_frames(video_path, method, threshold, frame_dir)
 
@@ -97,7 +104,7 @@ async def extract_frames_api(
 @app.get("/get-frame/{unique_id}/{frame_name}")
 async def get_frame(unique_id: str, frame_name: str):
     """Serve a specific frame as an image."""
-    frame_path = os.path.join(TEMP_STORAGE, unique_id, frame_name)
+    frame_path = os.path.join(STORAGE_FOLDER, unique_id, frame_name)
     if not os.path.exists(frame_path):
         raise HTTPException(
             status_code=404,
@@ -140,8 +147,8 @@ async def get_background_task_status(unique_id: str):
 async def list_available_images():
     """List all available images currently stored in the system."""
     images = []
-    for unique_id in os.listdir(TEMP_STORAGE):
-        frame_dir = os.path.join(TEMP_STORAGE, unique_id)
+    for unique_id in os.listdir(STORAGE_FOLDER):
+        frame_dir = os.path.join(STORAGE_FOLDER, unique_id)
         if os.path.isdir(frame_dir):
             for frame_name in os.listdir(frame_dir):
                 if frame_name.endswith(".png"):  # Only include PNG images
@@ -157,8 +164,8 @@ async def get_all_images(request: Request):
     """Return an HTML page displaying all available images."""
     base_url = str(request.base_url).rstrip("/")  # Get the base URL (e.g., http://127.0.0.1:8000)
     images_html = []
-    for unique_id in os.listdir(TEMP_STORAGE):
-        frame_dir = os.path.join(TEMP_STORAGE, unique_id)
+    for unique_id in os.listdir(STORAGE_FOLDER):
+        frame_dir = os.path.join(STORAGE_FOLDER, unique_id)
         if os.path.isdir(frame_dir):
             for frame_name in os.listdir(frame_dir):
                 if frame_name.endswith(".png"):  # Only include PNG images
