@@ -150,12 +150,11 @@ async def list_available_images():
         frame_dir = os.path.join(STORAGE_FOLDER, unique_id)
         if os.path.isdir(frame_dir):
             for frame_name in os.listdir(frame_dir):
-                if frame_name.endswith(".png"):  # Only include PNG images
-                    images.append({
-                        "unique_id": unique_id,
-                        "frame_name": frame_name,
-                        "path": os.path.join(frame_dir, frame_name)
-                    })
+                images.append({
+                    "unique_id": unique_id,
+                    "frame_name": frame_name,
+                    "path": os.path.join(frame_dir, frame_name)
+                })
     return JSONResponse(content={"images": images})
 
 @app.get("/all-images", response_class=HTMLResponse)
@@ -167,14 +166,13 @@ async def get_all_images(request: Request):
         frame_dir = os.path.join(STORAGE_FOLDER, unique_id)
         if os.path.isdir(frame_dir):
             for frame_name in os.listdir(frame_dir):
-                if frame_name.endswith(".png"):  # Only include PNG images
-                    image_url = f"{base_url}/get-frame/{unique_id}/{frame_name}"
-                    images_html.append(
-                        f'<div style="margin: 20px; text-align: center;">'
-                        f'<h3>{frame_name}</h3>'
-                        f'<img src="{image_url}" style="max-width: 100%; height: auto;"/>'
-                        f'</div>'
-                    )
+                image_url = f"{base_url}/get-frame/{unique_id}/{frame_name}"
+                images_html.append(
+                    f'<div style="margin: 20px; text-align: center;">'
+                    f'<h3>{frame_name}</h3>'
+                    f'<img src="{image_url}" style="max-width: 100%; height: auto;"/>'
+                    f'</div>'
+                )
     html_content = f"""
     <html>
         <head>
