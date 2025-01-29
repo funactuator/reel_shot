@@ -8,6 +8,9 @@ import shutil
 import time
 from datetime import datetime
 from typing import Dict, List
+import subprocess
+from fastapi import Form
+
 
 # Load environment variables
 STORAGE_FOLDER = os.getenv("STORAGE_FOLDER", "storage")
@@ -189,6 +192,80 @@ async def get_all_images(request: Request):
     </html>
     """
     return HTMLResponse(content=html_content)
+
+
+@app.post("/extract-frames-url")
+async def extract_frames_url_api(
+    reel_url: str = Form(...),
+    method: str = Form('ssim'),
+    threshold: float = Form(0.8),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+):
+    # Validate method
+    if method not in ['ssim', 'pixel']:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid method. Use 'ssim' or 'pixel'."
+        )
+
+    # Validate threshold
+    if not (0 <= threshold <= 1):
+        raise HTTPException(
+            status_code=400,
+            detail="Threshold must be between 0 and 1."
+        )
+
+    try:
+        # Generate a unique ID for this reel
+        unique_id = str(uuid.uuid4())
+        # Temporary video filename
+        video_path = f"temp_instagram_reel_{unique_id}.mp4"
+
+        # Download the reel using yt-dlp
+        # Note: For publicly accessible reels only
+        command = [
+            "yt-dlp",
+            "-f", "mp4",
+            "--output", video_path,
+            reel_url
+        ]
+        subprocess.run(command, check=True)
+
+        # Extract frames
+        frame_dir = os.path.join(STORAGE_FOLDER, unique_id)
+        os.makedirs(frame_dir, exist_ok=True)
+        frames = extract_frames(video_path, method, threshold, frame_dir)
+
+        # Clean up temporary video
+        os.remove(video_path)
+
+        # Schedule deletion after X minutes
+        background_tasks.add_task(delete_frames_after_delay, unique_id)
+
+        # Store background task info
+        background_tasks_storage[unique_id] = {
+            "status": "pending",
+            "start_time": datetime.now().isoformat(),
+            "end_time": None,
+            "frames": list(frames.keys()),
+        }
+
+        # Return unique ID and frame URLs
+        frame_urls = {
+            name: f"/get-frame/{unique_id}/{name}" for name in frames.keys()
+        }
+        return {"unique_id": unique_id, "frames": frame_urls}
+
+    except subprocess.CalledProcessError:
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to download reel. Make sure the URL is correct and publicly accessible."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing reel URL: {str(e)}"
+        )
 
 # Custom exception handler for 404 errors
 @app.exception_handler(404)
