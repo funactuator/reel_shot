@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request, Form
 from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from utils.video_utils import extract_frames
@@ -44,8 +44,8 @@ def delete_frames_after_delay(unique_id: str, delay_minutes: int = DELETE_DELAY_
 @app.post("/extract-frames")
 async def extract_frames_api(
     video_file: UploadFile = File(...),
-    method: str = 'ssim',
-    threshold: float = 0.8,
+    method: str = Form("ssim"),
+    threshold: float = Form(0.8),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     # Validate method

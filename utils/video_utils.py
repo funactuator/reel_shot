@@ -32,7 +32,7 @@ def extract_frames(video_path, method, threshold, frame_dir):
             elif method == 'pixel':
                 diff = cv2.absdiff(prev_frame, gray_frame)
                 diff_percent = (np.count_nonzero(diff) / diff.size) * 100
-                if diff_percent > threshold:
+                if diff_percent < threshold:
                     frame_name = f'frame_{frame_count}.png'
                     frames[frame_name] = encode_frame(frame)
                     save_frame(frame, frame_name, frame_dir)
